@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SNAP Activity Tracker</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#121d30;--line:#26364d;--text:#f3f6fb;--muted:#9aabc1;--accent:#f97316;--green:#22c55e;--blue:#60a5fa}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:900px;margin:0 auto;padding:24px 16px 40px}.head{display:flex;gap:14px;align-items:center;margin-bottom:22px}
+.logo{width:52px;height:52px;border-radius:15px;background:var(--accent);display:grid;place-items:center;color:#fff;font-weight:900;font-size:20px}
+h1{font-size:25px;margin:0} .sub{color:var(--muted);font-size:13px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px;margin:14px 0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.stat{background:#0c1628;border:1px solid var(--line);border-radius:14px;padding:14px;min-width:0}
+.label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+.value{font-size:clamp(21px,4vw,30px);font-weight:750;margin-top:5px;font-variant-numeric:tabular-nums}
+.green{color:var(--green)}.orange{color:var(--accent)}.blue{color:var(--blue)}
+button{border:0;border-radius:10px;padding:11px 15px;font-weight:700;cursor:pointer;background:var(--accent);color:white}
+button.secondary{background:#26364d}button:disabled{opacity:.5;cursor:not-allowed}
+.note{color:var(--muted);font-size:13px}
+.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:99px;padding:5px 10px;color:var(--muted);font-size:12px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}.dot.on{background:var(--green)}
+.bar{height:10px;border-radius:99px;background:#26364d;overflow:hidden;display:flex;margin:12px 0}.barActive{background:var(--green)}.barIdle{background:var(--accent)}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:9px 6px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-weight:600}
+footer{color:var(--muted);font-size:12px;margin-top:18px}
+@media(max-width:620px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stats .stat:last-child{grid-column:1/-1}.value{font-size:24px}.panel{padding:14px}}
+</style>
+</head>
+<body>
+<main>
+  <header class="head">
+    <div class="logo">S</div>
+    <div><h1>SNAP Activity Tracker</h1><div class="sub">Personal, tab-local activity summary</div></div>
+  </header>
+
+  <section class="panel">
+    <div class="row">
+      <div><span class="pill"><span class="dot" id="dot"></span><span id="state">Not started</span></span></div>
+      <div class="note" id="dateLabel"></div>
+    </div>
+    <div class="stats" style="margin-top:15px">
+      <div class="stat"><div class="label">Observed active</div><div class="value green" id="active">00:00:00</div></div>
+      <div class="stat"><div class="label">Observed idle</div><div class="value orange" id="idle">00:00:00</div></div>
+      <div class="stat"><div class="label">Session elapsed</div><div class="value" id="elapsed">00:00:00</div></div>
+    </div>
+    <div class="bar"><div class="barActive" id="activeBar" style="width:0%"></div><div class="barIdle" id="idleBar" style="width:0%"></div></div>
+    <div class="row note"><span id="ratio">Active 0% · Idle 0%</span><span>Idle threshold: 60 sec</span></div>
+    <div class="row" style="justify-content:flex-start;margin-top:17px">
+      <button id="start">Start tracking</button>
+      <button id="pause" class="secondary" disabled>Pause</button>
+      <button id="end" class="secondary" disabled>End session</button>
+    </div>
+    <p class="note">Counts only keyboard/mouse events delivered to this page while it is visible. It does not simulate input or monitor other apps.</p>
+  </section>
+
+  <section class="panel">
+    <div class="row"><h2 style="font-size:18px;margin:0">Input events</h2><span class="pill">No typed text stored</span></div>
+    <div class="stats" style="margin-top:12px">
+      <div class="stat"><div class="label">Mouse moves</div><div class="value blue" id="moves">0</div></div>
+      <div class="stat"><div class="label">Mouse clicks</div><div class="value blue" id="clicks">0</div></div>
+      <div class="stat"><div class="label">Keyboard events</div><div class="value blue" id="keys">0</div></div>
+    </div>
+    <p class="note">Mouse moves are sampled at most once every 500 ms to avoid excessive counting. Keyboard event totals are counted without saving keys or text.</p>
+  </section>
+
+  <section class="panel">
+    <div class="row"><h2 style="font-size:18px;margin:0">Today's summary</h2><button id="export" class="secondary">Export CSV</button></div>
+    <p class="note">Summary is saved locally in this browser when available. Browser storage may be disabled by your organization.</p>
+    <table><thead><tr><th>Date</th><th>Sessions</th><th>Active</th><th>Idle</th><th>Mouse clicks</th><th>Keys</th></tr></thead><tbody id="daily"></tbody></table>
+    <div class="row" style="justify-content:flex-start;margin-top:12px"><button id="clear" class="secondary">Clear saved summaries</button></div>
+  </section>
+  <footer>Privacy note: this page cannot observe activity in other applications, detect every PC lock reliably, or change your employer's activity report. When the page is hidden or suspended, elapsed time is classified as unobserved rather than active.</footer>
+</main>
+<script>
+(() => {
+  const THRESHOLD = 60000;
+  const STORE_KEY = "snapActivityTrackerDailyV1";
+  const $ = id => document.getElementById(id);
+  const today = () => new Date().toLocaleDateString("en-CA");
+  const fmt = ms => {
+    let s = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(s / 3600); s %= 3600;
+    const m = Math.floor(s / 60); s %= 60;
+    return [h,m,s].map(n => String(n).padStart(2,"0")).join(":");
+  };
+  let running = false, paused = false, started = 0, lastInput = 0, lastTick = 0;
+  let activeMs = 0, idleMs = 0, unobservedMs = 0;
+  let moves = 0, clicks = 0, keys = 0, sessions = 0, lastMoveCount = 0;
+  let lastMoveSample = 0, pageHiddenAt = null, timer = null;
+  let data = {};
+  try { data = JSON.parse(localStorage.getItem(STORE_KEY) || "{}"); } catch (_) { data = {}; }
+
+  function saveDaily() {
+    const d = today();
+    if (!data[d]) data[d] = {sessions:0, active:0, idle:0, unobserved:0, moves:0, clicks:0, keys:0};
+    const r = data[d];
+    r.sessions = sessions;
+    r.active = activeMs; r.idle = idleMs; r.unobserved = unobservedMs;
+    r.moves = moves; r.clicks = clicks; r.keys = keys;
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch (_) {}
+    renderDaily();
+  }
+  function setState(text, on=false) { $("state").textContent = text; $("dot").classList.toggle("on",on); }
+  function addObservedTime(now) {
+    if (!running || paused || !lastTick) { lastTick = now; return; }
+    const delta = Math.max(0, now - lastTick);
+    if (document.visibilityState !== "visible") unobservedMs += delta;
+    else if (now - lastInput < THRESHOLD) activeMs += delta;
+    else idleMs += delta;
+    lastTick = now;
+  }
+  function render() {
+    const now = performance.now();
+    let a = activeMs, i = idleMs, u = unobservedMs;
+    if (running && !paused && lastTick) {
+      const d = Math.max(0, now-lastTick);
+      if (document.visibilityState !== "visible") u += d;
+      else if (now-lastInput < THRESHOLD) a += d;
+      else i += d;
+    }
+    $("active").textContent = fmt(a);
+    $("idle").textContent = fmt(i);
+    $("elapsed").textContent = fmt(a+i+u);
+    const total = a+i+u;
+    const ap = total ? a/total*100 : 0, ip = total ? i/total*100 : 0;
+    $("activeBar").style.width = ap+"%";
+    $("idleBar").style.width = ip+"%";
+    $("ratio").textContent = `Active ${Math.round(ap)}% · Idle ${Math.round(ip)}% · Unobserved ${Math.round(total ? u/total*100 : 0)}%`;
+    $("moves").textContent = moves.toLocaleString();
+    $("clicks").textContent = clicks.toLocaleString();
+    $("keys").textContent = keys.toLocaleString();
+    $("dateLabel").textContent = new Date().toLocaleDateString(undefined,{weekday:"short",year:"numeric",month:"short",day:"numeric"});
+  }
+  function start() {
+    if (running && !paused) return;
+    if (!running) { sessions++; started = performance.now(); activeMs=0; idleMs=0; unobservedMs=0; moves=0; clicks=0; keys=0; }
+    running = true; paused = false; lastInput = performance.now(); lastTick = lastInput;
+    setState("Tracking in this tab",true);
+    $("start").disabled = true; $("pause").disabled = false; $("end").disabled = false;
+    saveDaily(); render();
+  }
+  function pause() {
+    if (!running || paused) return;
+    addObservedTime(performance.now()); paused=true; setState("Paused");
+    $("start").disabled=false; $("pause").disabled=true; saveDaily(); render();
+  }
+  function end() {
+    if (!running) return;
+    if (!paused) addObservedTime(performance.now());
+    running=false; paused=false; lastTick=0; setState("Session ended");
+    $("start").disabled=false; $("pause").disabled=true; $("end").disabled=true;
+    saveDaily(); render();
+  }
+  function input(kind) {
+    if (!running || paused || document.visibilityState !== "visible") return;
+    const now=performance.now();
+    addObservedTime(now);
+    lastInput=now;
+    if (kind==="move") {
+      if (now-lastMoveSample >= 500) { moves++; lastMoveSample=now; }
+    } else if (kind==="click") clicks++;
+    else if (kind==="key") keys++;
+    render();
+  }
+  $("start").addEventListener("click",start);
+  $("pause").addEventListener("click",pause);
+  $("end").addEventListener("click",end);
+  document.addEventListener("mousemove",()=>input("move"),{passive:true});
+  document.addEventListener("mousedown",()=>input("click"),{passive:true});
+  document.addEventListener("touchstart",()=>input("click"),{passive:true});
+  document.addEventListener("keydown",()=>input("key"));
+  document.addEventListener("visibilitychange",()=>{
+    if (!running || paused) return;
+    if (document.visibilityState==="hidden") {
+      addObservedTime(performance.now()); pageHiddenAt=performance.now(); setState("Tab hidden — time unobserved");
+    } else {
+      lastTick=performance.now(); lastInput=lastTick; pageHiddenAt=null; setState("Tracking in this tab",true);
+    }
+    saveDaily(); render();
+  });
+  function renderDaily() {
+    const tbody=$("daily"); tbody.innerHTML="";
+    const d=today(), r=data[d];
+    if (!r) { tbody.innerHTML='<tr><td colspan="6" class="note">No saved summary yet. Start a session to begin.</td></tr>'; return; }
+    const tr=document.createElement("tr");
+    [d,r.sessions,fmt(r.active||0),fmt(r.idle||0),r.clicks||0,r.keys||0].forEach(v=>{
+      const td=document.createElement("td"); td.textContent=String(v); tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  }
+  $("export").addEventListener("click",()=>{
+    const rows=[["Date","Sessions","Observed Active","Observed Idle","Unobserved","Mouse Moves","Mouse Clicks","Keyboard Events"]];
+    Object.keys(data).sort().forEach(d=>{const r=data[d];rows.push([d,r.sessions||0,fmt(r.active||0),fmt(r.idle||0),fmt(r.unobserved||0),r.moves||0,r.clicks||0,r.keys||0]);});
+    const csv=rows.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("\r\n");
+    const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+    const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="snap-activity-summary.csv";a.click();URL.revokeObjectURL(url);
+  });
+  $("clear").addEventListener("click",()=>{
+    if (!confirm("Delete saved daily summaries from this browser?")) return;
+    data={};try{localStorage.removeItem(STORE_KEY);}catch(_){}renderDaily();
+  });
+  timer=setInterval(()=>{if(running&&!paused){addObservedTime(performance.now());render();saveDaily();}else render();},1000);
+  renderDaily();render();
+})();
+</script>
+</body>
+</html>
